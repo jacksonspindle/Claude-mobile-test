@@ -55,10 +55,10 @@ const fetchSeatGeekEvents = async () => {
     // Filter for free or low-cost events and format them
     const formattedEvents = events
       .filter(event => {
-        // Include events that are free or very low cost (under $20)
+        // Include events that are free or affordable (under $30)
         const stats = event.stats;
         const lowestPrice = stats?.lowest_price || 0;
-        return lowestPrice === null || lowestPrice === 0 || lowestPrice < 20;
+        return lowestPrice === null || lowestPrice === 0 || lowestPrice <= 30;
       })
       .map(event => {
         const startTime = new Date(event.datetime_local);

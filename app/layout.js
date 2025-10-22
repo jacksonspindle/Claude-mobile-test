@@ -1,8 +1,8 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'NYC Free Live Music Tonight',
-  description: 'Find free live music events happening today in NYC',
+  title: 'NYC Affordable Live Music Tonight',
+  description: 'Find free and affordable live music events (under $30) happening today in NYC',
 }
 
 export default function RootLayout({ children }) {
