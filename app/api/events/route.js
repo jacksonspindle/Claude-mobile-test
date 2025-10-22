@@ -1,82 +1,79 @@
+import axios from 'axios';
+
 export const dynamic = 'force-dynamic';
 
-// Mock data for demonstration
-// In production, replace this with real API calls to Eventbrite, Ticketmaster, etc.
-const getMockEvents = () => {
-  const today = new Date();
-  const dateStr = today.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric'
-  });
+// Fetch events from SeatGeek API (free tier with client_id)
+const fetchSeatGeekEvents = async () => {
+  const SEATGEEK_CLIENT_ID = process.env.SEATGEEK_CLIENT_ID;
 
-  return [
-    {
-      id: '1',
-      title: 'Live Jazz Night',
-      venue: 'The Blue Note',
-      address: '131 W 3rd St, New York, NY 10012',
-      time: '8:00 PM - 11:00 PM',
-      description: 'Enjoy an evening of smooth jazz with local artists. No cover charge, just great music and vibes.',
-      free: true,
-      date: dateStr
-    },
-    {
-      id: '2',
-      title: 'Open Mic Acoustic Session',
-      venue: 'Rockwood Music Hall',
-      address: '196 Allen St, New York, NY 10002',
-      time: '7:00 PM - 10:00 PM',
-      description: 'Local singer-songwriters showcase their original acoustic music. Free entry, donations welcome.',
-      free: true,
-      date: dateStr
-    },
-    {
-      id: '3',
-      title: 'Indie Rock Showcase',
-      venue: 'Mercury Lounge',
-      address: '217 E Houston St, New York, NY 10002',
-      time: '9:00 PM - 12:00 AM',
-      description: 'Three up-and-coming indie rock bands. Free admission before 9:30 PM.',
-      free: true,
-      date: dateStr
-    },
-    {
-      id: '4',
-      title: 'Brooklyn Blues Night',
-      venue: 'Brooklyn Bowl',
-      address: '61 Wythe Ave, Brooklyn, NY 11249',
-      time: '6:00 PM - 9:00 PM',
-      description: 'Classic blues performances by Brooklyn-based musicians. Free entry, full bar available.',
-      free: true,
-      date: dateStr
-    },
-    {
-      id: '5',
-      title: 'Latin Music Night',
-      venue: 'SOBs',
-      address: '204 Varick St, New York, NY 10014',
-      time: '8:30 PM - 11:30 PM',
-      description: 'Salsa, bachata, and reggaeton live performances. No cover charge on Tuesdays.',
-      free: true,
-      date: dateStr
-    },
-    {
-      id: '6',
-      title: 'Folk & Americana Open Stage',
-      venue: 'The Bitter End',
-      address: '147 Bleecker St, New York, NY 10012',
-      time: '7:30 PM - 10:30 PM',
-      description: 'Historic venue hosting folk and Americana artists. Free show, 1 drink minimum.',
-      free: true,
-      date: dateStr
-    }
-  ];
+  if (!SEATGEEK_CLIENT_ID) {
+    return [];
+  }
+
+  try {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+
+    // SeatGeek API - free tier available at https://seatgeek.com/
+    const response = await axios.get('https://api.seatgeek.com/2/events', {
+      params: {
+        'client_id': SEATGEEK_CLIENT_ID,
+        'venue.city': 'New York',
+        'venue.state': 'NY',
+        'datetime_local.gte': dateStr,
+        'datetime_local.lte': dateStr,
+        'taxonomies.name': 'concert',
+        'per_page': 100,
+        'sort': 'datetime_local.asc'
+      },
+      timeout: 10000
+    });
+
+    const events = response.data.events || [];
+
+    // Filter for free or low-cost events and format them
+    const formattedEvents = events
+      .filter(event => {
+        // Include events that are free or very low cost (under $20)
+        const stats = event.stats;
+        const lowestPrice = stats?.lowest_price || 0;
+        return lowestPrice === null || lowestPrice === 0 || lowestPrice < 20;
+      })
+      .map(event => {
+        const startTime = new Date(event.datetime_local);
+        const venue = event.venue;
+        const isFree = !event.stats?.lowest_price || event.stats.lowest_price === 0;
+
+        return {
+          id: event.id.toString(),
+          title: event.title || event.short_title,
+          venue: venue?.name || 'TBA',
+          address: venue?.address ? `${venue.address}, ${venue.extended_address}` : venue?.display_location || '',
+          time: startTime.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          }),
+          description: `${event.type || 'Concert'} at ${venue?.name || 'venue'}. ${isFree ? 'Free event!' : `Starting from $${event.stats?.lowest_price}`}`,
+          free: isFree,
+          date: startTime.toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric'
+          }),
+          url: event.url,
+          image: event.performers?.[0]?.image || null
+        };
+      });
+
+    return formattedEvents;
+  } catch (error) {
+    console.error('Error fetching SeatGeek events:', error.message);
+    return [];
+  }
 };
 
-// Function to fetch real events from Eventbrite API
-// Uncomment and add your API key to use real data
-/*
+// Fetch events from Eventbrite API (requires API key)
 const fetchEventbriteEvents = async () => {
   const EVENTBRITE_API_KEY = process.env.EVENTBRITE_API_KEY;
 
@@ -86,80 +83,261 @@ const fetchEventbriteEvents = async () => {
 
   try {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const response = await fetch(
-      `https://www.eventbriteapi.com/v3/events/search/?` +
-      `location.address=New York, NY&` +
-      `categories=103&` + // Music category
-      `price=free&` +
-      `start_date.range_start=${today.toISOString()}&` +
-      `start_date.range_end=${tomorrow.toISOString()}&` +
-      `expand=venue`,
-      {
-        headers: {
-          'Authorization': `Bearer ${EVENTBRITE_API_KEY}`
-        }
-      }
-    );
+    const response = await axios.get('https://www.eventbriteapi.com/v3/events/search/', {
+      params: {
+        'location.address': 'New York, NY',
+        'categories': '103', // Music category
+        'price': 'free',
+        'start_date.range_start': today.toISOString(),
+        'start_date.range_end': tomorrow.toISOString(),
+        'expand': 'venue'
+      },
+      headers: {
+        'Authorization': `Bearer ${EVENTBRITE_API_KEY}`
+      },
+      timeout: 10000
+    });
 
-    const data = await response.json();
+    const events = response.data.events || [];
 
-    return data.events?.map(event => ({
-      id: event.id,
-      title: event.name.text,
-      venue: event.venue?.name || 'TBA',
-      address: event.venue?.address?.localized_address_display || '',
-      time: new Date(event.start.local).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit'
-      }),
-      description: event.description?.text?.substring(0, 200) || 'No description available',
-      free: event.is_free,
-      date: new Date(event.start.local).toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric'
-      }),
-      url: event.url
-    })) || [];
+    return events.map(event => {
+      const startTime = new Date(event.start.local);
+
+      return {
+        id: event.id,
+        title: event.name.text,
+        venue: event.venue?.name || 'TBA',
+        address: event.venue?.address?.localized_address_display || '',
+        time: startTime.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }),
+        description: event.description?.text?.substring(0, 200) || 'No description available',
+        free: true,
+        date: startTime.toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric'
+        }),
+        url: event.url,
+        image: event.logo?.url || null
+      };
+    });
   } catch (error) {
-    console.error('Error fetching Eventbrite events:', error);
+    console.error('Error fetching Eventbrite events:', error.message);
     return [];
   }
 };
-*/
+
+// Enhanced mock data with real NYC venues and their typical free music nights
+const getMockEvents = () => {
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+  // Different events based on actual day of week (many venues have specific free nights)
+  const weeklyEvents = {
+    1: [ // Monday
+      {
+        title: 'Monday Night Jazz Jam',
+        venue: 'Zinc Bar',
+        address: '82 W 3rd St, New York, NY 10012',
+        time: '9:00 PM',
+        description: 'Open jazz jam session with professional musicians. No cover charge.',
+        url: 'https://www.zincbar.com'
+      }
+    ],
+    2: [ // Tuesday
+      {
+        title: 'Tuesday Blues Jam',
+        venue: 'Terra Blues',
+        address: '149 Bleecker St, New York, NY 10012',
+        time: '9:30 PM',
+        description: 'Open blues jam with house band. Free admission.',
+        url: 'https://www.terrablues.com'
+      }
+    ],
+    3: [ // Wednesday
+      {
+        title: 'Rockwood Music Hall Free Shows',
+        venue: 'Rockwood Music Hall',
+        address: '196 Allen St, New York, NY 10002',
+        time: '6:00 PM',
+        description: 'Multiple free shows throughout the evening featuring emerging artists.',
+        url: 'https://www.rockwoodmusichall.com'
+      }
+    ],
+    4: [ // Thursday
+      {
+        title: 'Open Mic Night',
+        venue: 'The Bitter End',
+        address: '147 Bleecker St, New York, NY 10012',
+        time: '7:00 PM',
+        description: 'Historic Greenwich Village venue hosts open mic night. Free entry.',
+        url: 'https://www.bitterend.com'
+      }
+    ],
+    5: [ // Friday
+      {
+        title: 'Friday Night Live',
+        venue: "Arlene's Grocery",
+        address: '95 Stanton St, New York, NY 10002',
+        time: '8:00 PM',
+        description: 'Free rock shows in the Lower East Side. Multiple bands.',
+        url: 'https://www.arlenesgrocery.net'
+      }
+    ],
+    6: [ // Saturday
+      {
+        title: 'Saturday Afternoon Jazz',
+        venue: 'The Django',
+        address: '2 6th Ave, New York, NY 10013',
+        time: '3:00 PM',
+        description: 'Free jazz brunch performances. World-class musicians.',
+        url: 'https://www.thedjangonyc.com'
+      }
+    ],
+    0: [ // Sunday
+      {
+        title: 'Sunday Gospel Brunch',
+        venue: 'Ginny\'s Supper Club',
+        address: '310 Malcolm X Blvd, New York, NY 10027',
+        time: '11:00 AM',
+        description: 'Live gospel music with Sunday brunch in Harlem.',
+        url: 'https://www.ginnyssupperclub.com'
+      }
+    ]
+  };
+
+  // Common venues with frequent free shows
+  const commonEvents = [
+    {
+      title: 'Live Music Night',
+      venue: 'Pianos',
+      address: '158 Ludlow St, New York, NY 10002',
+      time: '8:00 PM',
+      description: 'Free live music on the main stage. Rock, indie, and alternative.',
+      url: 'https://www.pianosnyc.com'
+    },
+    {
+      title: 'Open Stage',
+      venue: 'Googie\'s Lounge',
+      address: '300 W 135th St, New York, NY 10030',
+      time: '7:30 PM',
+      description: 'Free open mic and live performances in a cozy Harlem spot.',
+      url: 'https://www.googieslounge.com'
+    },
+    {
+      title: 'Songwriter Showcase',
+      venue: 'The Living Room',
+      address: '154 Ludlow St, New York, NY 10002',
+      time: '9:00 PM',
+      description: 'Acoustic singer-songwriter performances. No cover charge.',
+      url: 'https://www.livingroomny.com'
+    }
+  ];
+
+  const dayEvents = weeklyEvents[dayOfWeek] || [];
+  const allEvents = [...dayEvents, ...commonEvents.slice(0, 3)];
+
+  return allEvents.map((event, index) => ({
+    id: `mock-${index}`,
+    title: event.title,
+    venue: event.venue,
+    address: event.address,
+    time: event.time,
+    description: event.description,
+    free: true,
+    date: dateStr,
+    url: event.url
+  }));
+};
 
 export async function GET() {
   try {
-    // Try to fetch real events first
-    // const realEvents = await fetchEventbriteEvents();
+    console.log('Fetching events from multiple sources...');
 
-    // For now, use mock data
-    // In production, uncomment the line above and use: const events = realEvents.length > 0 ? realEvents : getMockEvents();
-    const events = getMockEvents();
+    // Fetch from multiple sources in parallel
+    const [seatGeekEvents, eventbriteEvents] = await Promise.all([
+      fetchSeatGeekEvents(),
+      fetchEventbriteEvents()
+    ]);
+
+    console.log(`Found ${seatGeekEvents.length} SeatGeek events`);
+    console.log(`Found ${eventbriteEvents.length} Eventbrite events`);
+
+    // Combine all events
+    let allEvents = [...seatGeekEvents, ...eventbriteEvents];
+
+    // If no real events found, use mock data with real venues
+    if (allEvents.length === 0) {
+      console.log('No real events found, using mock data with real NYC venues');
+      allEvents = getMockEvents();
+    }
+
+    // Remove duplicates based on title and venue
+    const uniqueEvents = allEvents.filter((event, index, self) =>
+      index === self.findIndex(e =>
+        e.title.toLowerCase() === event.title.toLowerCase() &&
+        e.venue.toLowerCase() === event.venue.toLowerCase()
+      )
+    );
+
+    // Sort by time
+    uniqueEvents.sort((a, b) => {
+      const timeA = new Date(`2000-01-01 ${a.time}`);
+      const timeB = new Date(`2000-01-01 ${b.time}`);
+      return timeA - timeB;
+    });
 
     return Response.json({
       success: true,
-      count: events.length,
+      count: uniqueEvents.length,
       date: new Date().toLocaleDateString('en-US', {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
         year: 'numeric'
       }),
-      events: events
+      events: uniqueEvents,
+      sources: {
+        seatgeek: seatGeekEvents.length,
+        eventbrite: eventbriteEvents.length,
+        mock: allEvents.length === getMockEvents().length
+      }
     });
   } catch (error) {
     console.error('Error in events API:', error);
-    return Response.json(
-      {
-        success: false,
-        error: 'Failed to fetch events',
-        events: []
+
+    // Fallback to mock data on error
+    const mockEvents = getMockEvents();
+
+    return Response.json({
+      success: true,
+      count: mockEvents.length,
+      date: new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      }),
+      events: mockEvents,
+      sources: {
+        seatgeek: 0,
+        eventbrite: 0,
+        mock: true
       },
-      { status: 500 }
-    );
+      error: 'Using fallback data due to API error'
+    });
   }
 }

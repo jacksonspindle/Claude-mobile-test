@@ -104,15 +104,9 @@ export default function Home() {
                   href={event.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-block',
-                    marginTop: '1rem',
-                    color: '#667eea',
-                    textDecoration: 'none',
-                    fontSize: '0.9rem'
-                  }}
+                  className="event-link"
                 >
-                  View Details →
+                  View Event Details →
                 </a>
               )}
             </div>
