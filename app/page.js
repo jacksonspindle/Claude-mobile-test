@@ -40,16 +40,13 @@ export default function Home() {
   return (
     <div className="container">
       <header className="header">
-        <h1>NYC Affordable Live Music Tonight</h1>
+        <h1>NYC Live Music Tonight</h1>
         <p>{dateString || 'Loading...'}</p>
-        <p style={{ fontSize: '0.9rem', color: '#888', marginTop: '0.5rem' }}>
-          Free & under $30
-        </p>
       </header>
 
       {loading && (
         <div className="loading">
-          <p>Finding free live music events...</p>
+          <p>Finding live music events...</p>
         </div>
       )}
 
@@ -75,7 +72,7 @@ export default function Home() {
 
       {!loading && !error && events.length === 0 && (
         <div className="no-events">
-          <p>No affordable live music events found for today.</p>
+          <p>No live music events found for today.</p>
           <p style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
             Check back later or try again tomorrow!
           </p>
@@ -124,9 +121,9 @@ export default function Home() {
         color: '#666',
         fontSize: '0.9rem'
       }}>
-        <p>🎵 Discover affordable live music in NYC every day</p>
+        <p>🎵 Discover live music in NYC every day</p>
         <p style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}>
-          Free & under $30 • Data updates automatically
+          Data updates automatically • Powered by SeatGeek
         </p>
       </footer>
     </div>
