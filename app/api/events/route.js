@@ -2,11 +2,13 @@ import axios from 'axios';
 
 export const dynamic = 'force-dynamic';
 
-// Fetch events from SeatGeek API (free tier with client_id)
+// Fetch events from SeatGeek API (requires both client_id and client_secret)
 const fetchSeatGeekEvents = async () => {
   const SEATGEEK_CLIENT_ID = process.env.SEATGEEK_CLIENT_ID;
+  const SEATGEEK_CLIENT_SECRET = process.env.SEATGEEK_CLIENT_SECRET;
 
-  if (!SEATGEEK_CLIENT_ID) {
+  if (!SEATGEEK_CLIENT_ID || !SEATGEEK_CLIENT_SECRET) {
+    console.log('Missing SeatGeek credentials');
     return [];
   }
 
@@ -14,41 +16,21 @@ const fetchSeatGeekEvents = async () => {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
 
-    // Try with Authorization header first (for API keys)
-    let response;
-    try {
-      response = await axios.get('https://api.seatgeek.com/2/events', {
-        params: {
-          'venue.city': 'New York',
-          'venue.state': 'NY',
-          'datetime_local.gte': dateStr,
-          'datetime_local.lte': dateStr,
-          'taxonomies.name': 'concert',
-          'per_page': 100,
-          'sort': 'datetime_local.asc'
-        },
-        headers: {
-          'Authorization': `Bearer ${SEATGEEK_CLIENT_ID}`
-        },
-        timeout: 10000
-      });
-    } catch (headerError) {
-      // If header auth fails, try as client_id parameter
-      console.log('Header auth failed, trying client_id parameter');
-      response = await axios.get('https://api.seatgeek.com/2/events', {
-        params: {
-          'client_id': SEATGEEK_CLIENT_ID,
-          'venue.city': 'New York',
-          'venue.state': 'NY',
-          'datetime_local.gte': dateStr,
-          'datetime_local.lte': dateStr,
-          'taxonomies.name': 'concert',
-          'per_page': 100,
-          'sort': 'datetime_local.asc'
-        },
-        timeout: 10000
-      });
-    }
+    // SeatGeek requires both client_id and client_secret as query parameters
+    const response = await axios.get('https://api.seatgeek.com/2/events', {
+      params: {
+        'client_id': SEATGEEK_CLIENT_ID,
+        'client_secret': SEATGEEK_CLIENT_SECRET,
+        'venue.city': 'New York',
+        'venue.state': 'NY',
+        'datetime_local.gte': dateStr,
+        'datetime_local.lte': dateStr,
+        'taxonomies.name': 'concert',
+        'per_page': 100,
+        'sort': 'datetime_local.asc'
+      },
+      timeout: 10000
+    });
 
     const events = response.data.events || [];
 
